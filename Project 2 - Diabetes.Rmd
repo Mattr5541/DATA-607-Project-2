@@ -1,0 +1,105 @@
+---
+title: "Project 2 - Diabetes Dataset"
+author: "Matthew Roland"
+date: "2023-10-03"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages(c("tidyverse", "dplyr", "stringr", "knitr"))
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+```
+**For this part of project 2, I will be working with the Diabetes dataset uploaded by Folorunsho Atanda on BlackBoard (https://bbhosted.cuny.edu/webapps/discussionboard/do/message?action=list_messages&course_id=_2303106_1&nav=discussion_board_entry&conf_id=_2781274_1&forum_id=_3717486_1&message_id=_69324188_1)**
+
+**To begin, I will read the dataset into R from my Github repo, add an ID column, clean the data such that the predictors of diabetes are grouped under one column, and then perform simple, descriptive analyses to determine which factors are most greatly associated with diabetes outcomes**
+
+## Loading the dataset & Adding an ID Variable
+```{r}
+diabetes <- read.csv("https://raw.githubusercontent.com/Mattr5541/DATA-607/main/Project%202/diabetes.csv")
+
+##Now, I want to add an ID variable, so we can more easily keep track of observations
+diabetes <- diabetes %>% mutate(ID = row_number())
+
+##Now, I would like to reorder the columns so that ID appears first
+diabetes <- diabetes %>% select(ID, everything())
+```
+
+
+## Converting this dataframe to a long format
+```{r}
+diabetes_long <- diabetes %>% pivot_longer(cols = c(Pregnancies:BMI, Age), names_to = "Predictors", values_to = "Values")
+
+diabetes_long <- diabetes_long %>% select(ID, Predictors, Values, DiabetesPedigreeFunction, Outcome)
+```
+
+## Determining mean values for preictors based on outcomes 
+```{r}
+##Next, I want to split this dataframe into two: one for negative (0) outcomes and one for positive (1) outcomes. This will make it easier to determine the mean values for each predictor based on the specific outcome
+
+diabetes_pos <- diabetes_long %>% filter(Outcome == 1)
+diabetes_neg <- diabetes_long %>% filter(Outcome == 0)
+```
+**First, I will determine the average pedigree level for individuals with diabetes versus those without diabetes, to determine if this is an appropriate marker for predicting diabetes**
+```{r}
+print((paste0("Number of people without diabetes: ", nrow(diabetes_neg))))
+print((paste0("Number of people with diabetes: ", nrow(diabetes_pos))))
+```
+**As we can see, the total number of individuals without diabetes is larger than the number of individuals with diabetes. From the perspective of generalizing to the population, this makes sense**
+```{r}
+mean_pedigree_neg <- diabetes_neg %>% summarize(mean_pedigree = mean(DiabetesPedigreeFunction)) 
+print(mean_pedigree_neg)
+
+mean_pedigree_pos <- diabetes_pos %>% summarize(mean_pedigree = mean(DiabetesPedigreeFunction)) 
+print(mean_pedigree_pos)
+
+##Median Values
+median_pedigree_neg <- diabetes_neg %>% summarize(median_pedigree = median(DiabetesPedigreeFunction)) 
+print(median_pedigree_neg)
+
+median_pedigree_pos <- diabetes_pos %>% summarize(median_pedigree = median(DiabetesPedigreeFunction)) 
+print(median_pedigree_pos)
+
+
+ggplot(diabetes_long, aes(x = DiabetesPedigreeFunction, y = after_stat(count))) + geom_histogram(binwidth = .05) + facet_wrap(~Outcome)
+```
+
+**All of this shows that the diabetes pedigree function, on average, is marginally higher for individuals diagnosed with diabetes than those who were not diagnosed with diabetes. The graphs show that the distributions for both categories are heavily positively skewed (which is sensible for this type of indicator), and the values tend to cluster closer to 1.0 when people are positive for diabetes than when they test negative for diabetes. Because of this heavy skew, I opted to determine the median values, as well. As we can see, the difference median differences between pedigrees diagnosed with diabetes versus not diagnosed with diabetes is substantially different. However, it may not serve as the most reliable indicator for predicting diabetes, as both the mean and median values for those diagnosed with diabetes are only around .5. It is important to note that this measure, of course, is only a marker for risk factors that lead to diabetes, however, and not of diabetes development, itself.**
+
+**Now, I will find the averages for each predictor:**
+
+```{r}
+unique(diabetes_long$Predictors)
+
+
+diabetes_means_neg <- diabetes_neg %>% group_by(Predictors) %>% summarize(Group_means = mean(Values))
+
+diabetes_means_pos <- diabetes_pos %>% group_by(Predictors) %>% summarize(Group_means = mean(Values))
+
+print(diabetes_means_neg)
+print(diabetes_means_pos)
+```
+**We can see that--as expected--all categories are elevated in the positive group when compared to the negative group. Let's investigate this further by using graphical comparisons**
+
+```{r}
+##I want to first combine these mean comparisons into a single dataframe
+diabetes_means_neg <- data_frame(diabetes_means_neg)
+diabetes_means_pos <- data_frame(diabetes_means_pos)
+
+diabetes_means_neg <- diabetes_means_neg %>% mutate(Outcome = 0)
+diabetes_means_pos <- diabetes_means_pos %>% mutate(Outcome = 1)
+
+diabetes_mean_append <- rbind(diabetes_means_neg, diabetes_means_pos)
+
+diabetes_mean_append <- diabetes_mean_append %>% mutate(Outcome = recode(Outcome, '0' = 'negative', '1' = 'positive'))
+
+ggplot(diabetes_mean_append, aes(x = Predictors, y = Group_means, fill = Outcome)) + geom_bar(stat= "identity", position = "dodge") + labs(title = "Mean Rates of Diabetes Predictors", y = "Means")
+```
+**Thus, as one would assume, insulin and glucose appear to be the best predictors of having diabetes, such that highly elevated insulin and glucose levels tend to correspond with the presence of diabetes**
