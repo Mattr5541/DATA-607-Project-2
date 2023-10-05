@@ -1,6 +1,6 @@
 ---
 title: "Project 2 - Diabetes Dataset"
-author: "Matthew Roland"
+author: "Matthew Roland, Jean Jimenez, Kelly Eng"
 date: "2023-10-03"
 output:
   pdf_document: default
@@ -17,11 +17,13 @@ library(stringr)
 library(tidyr)
 library(ggplot2)
 ```
-**For this part of project 2, I will be working with the Diabetes dataset uploaded by Folorunsho Atanda on BlackBoard (https://bbhosted.cuny.edu/webapps/discussionboard/do/message?action=list_messages&course_id=_2303106_1&nav=discussion_board_entry&conf_id=_2781274_1&forum_id=_3717486_1&message_id=_69324188_1)**
+
+**For this part of project 2, I will be working with the Diabetes dataset uploaded by Folorunsho Atanda on BlackBoard (<https://bbhosted.cuny.edu/webapps/discussionboard/do/message?action=list_messages&course_id=_2303106_1&nav=discussion_board_entry&conf_id=_2781274_1&forum_id=_3717486_1&message_id=_69324188_1>)**
 
 **To begin, I will read the dataset into R from my Github repo, add an ID column, clean the data such that the predictors of diabetes are grouped under one column, and then perform simple, descriptive analyses to determine which factors are most greatly associated with diabetes outcomes**
 
 ## Loading the dataset & Adding an ID Variable
+
 ```{r}
 diabetes <- read.csv("https://raw.githubusercontent.com/Mattr5541/DATA-607/main/Project%202/diabetes.csv")
 
@@ -32,27 +34,32 @@ diabetes <- diabetes %>% mutate(ID = row_number())
 diabetes <- diabetes %>% select(ID, everything())
 ```
 
-
 ## Converting this dataframe to a long format
+
 ```{r}
 diabetes_long <- diabetes %>% pivot_longer(cols = c(Pregnancies:BMI, Age), names_to = "Predictors", values_to = "Values")
 
 diabetes_long <- diabetes_long %>% select(ID, Predictors, Values, DiabetesPedigreeFunction, Outcome)
 ```
 
-## Determining mean values for preictors based on outcomes 
+## Determining mean values for preictors based on outcomes
+
 ```{r}
 ##Next, I want to split this dataframe into two: one for negative (0) outcomes and one for positive (1) outcomes. This will make it easier to determine the mean values for each predictor based on the specific outcome
 
 diabetes_pos <- diabetes_long %>% filter(Outcome == 1)
 diabetes_neg <- diabetes_long %>% filter(Outcome == 0)
 ```
+
 **First, I will determine the average pedigree level for individuals with diabetes versus those without diabetes, to determine if this is an appropriate marker for predicting diabetes**
+
 ```{r}
 print((paste0("Number of people without diabetes: ", nrow(diabetes_neg))))
 print((paste0("Number of people with diabetes: ", nrow(diabetes_pos))))
 ```
+
 **As we can see, the total number of individuals without diabetes is larger than the number of individuals with diabetes. From the perspective of generalizing to the population, this makes sense**
+
 ```{r}
 mean_pedigree_neg <- diabetes_neg %>% summarize(mean_pedigree = mean(DiabetesPedigreeFunction)) 
 print(mean_pedigree_neg)
@@ -86,6 +93,7 @@ diabetes_means_pos <- diabetes_pos %>% group_by(Predictors) %>% summarize(Group_
 print(diabetes_means_neg)
 print(diabetes_means_pos)
 ```
+
 **We can see that--as expected--all categories are elevated in the positive group when compared to the negative group. Let's investigate this further by using graphical comparisons**
 
 ```{r}
@@ -102,4 +110,35 @@ diabetes_mean_append <- diabetes_mean_append %>% mutate(Outcome = recode(Outcome
 
 ggplot(diabetes_mean_append, aes(x = Predictors, y = Group_means, fill = Outcome)) + geom_bar(stat= "identity", position = "dodge") + labs(title = "Mean Rates of Diabetes Predictors", y = "Means")
 ```
-**Thus, as one would assume, insulin and glucose appear to be the best predictors of having diabetes, such that highly elevated insulin and glucose levels tend to correspond with the presence of diabetes**
+
+**Thus, as one would assume, insulin and glucose appear to be the best predictors of having diabetes, such that highly elevated insulin and glucose levels tend to correspond with the presence of diabetes.**
+
+**Now I want to see the differences in the distribution of blood pressure between the two groups.**
+
+```{r}
+bloodPressure_pos <- diabetes_pos %>% 
+  filter(Predictors == "BloodPressure") %>%
+  mutate(Status = "Positive")
+
+bloodPressure_neg <- diabetes_neg %>%
+  filter(Predictors == "BloodPressure")
+
+# create an empty ggplot object
+bp = ggplot() +
+  ggtitle("Distribution of Blood Pressure in Diabetes Positive and Negative Groups") +
+  xlab("Diabetes Status") +
+  ylab("Blood Pressure Values")
+
+# Add boxplot for Positive group
+bp = bp + 
+  geom_boxplot(data = bloodPressure_pos, aes(x = "Positive", y = Values), colour='red')
+
+# Add boxplot for Negative group
+bp = bp + 
+  geom_boxplot(data = bloodPressure_neg, aes(x = "Negative", y = Values), colour='green')
+
+# Display the plot
+print(bp)
+```
+
+**The distributions of blood pressure between the diabetes negative and positive group is similar. However, the mean blood pressure of the diabetes group was slightly above the mean for the negative group. This may indicate that diabetes patients have higher blood pressure (or the other way around).**
